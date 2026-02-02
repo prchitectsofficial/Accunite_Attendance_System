@@ -11,7 +11,7 @@ function FreelancersPage() {
     const [sessionSummary, setSessionSummary] = useState({ totalHours: 0, totalBilling: 0, totalSessions: 0 });
     const [showModal, setShowModal] = useState(false);
     const [showCredentialModal, setShowCredentialModal] = useState(false);
-    const [newFreelancer, setNewFreelancer] = useState({ name: '', hourly_rate: '', freelancer_code: '' });
+    const [newFreelancer, setNewFreelancer] = useState({ name: '', hourly_rate: '', freelancer_code: '', email: '' });
     const [credentialFreelancer, setCredentialFreelancer] = useState(null);
     const [credentialEmail, setCredentialEmail] = useState('');
     const [credentialPassword, setCredentialPassword] = useState('');
@@ -306,7 +306,7 @@ function FreelancersPage() {
             await freelancerAPI.create(newFreelancer);
             showMessage('success', 'Freelancer added successfully');
             setShowModal(false);
-            setNewFreelancer({ name: '', hourly_rate: '', freelancer_code: '' });
+            setNewFreelancer({ name: '', hourly_rate: '', freelancer_code: '', email: '' });
             loadFreelancers();
         } catch (error) {
             showMessage('error', error.response?.data?.message || 'Failed to add freelancer');
@@ -393,6 +393,18 @@ function FreelancersPage() {
         return `${hours}h ${mins}m`;
     };
 
+    const formatDate = (dateString) => {
+        if (!dateString) return 'N/A';
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' });
+    };
+
+    const formatTime = (dateString) => {
+        if (!dateString) return 'N/A';
+        const date = new Date(dateString);
+        return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+    };
+
     const isAdmin = currentUser && (currentUser.role === 'admin' || currentUser.admin_id);
     const isFreelancer = currentUser && currentUser.role === 'freelancer';
 
@@ -431,8 +443,10 @@ function FreelancersPage() {
                 <table>
                     <thead>
                         <tr>
+                            <th>ID</th>
                             <th>Freelancer Code</th>
                             <th>Name</th>
+                            <th>Email</th>
                             <th>Hourly Rate</th>
                             <th>Status</th>
                             <th>Actions</th>
@@ -441,8 +455,10 @@ function FreelancersPage() {
                     <tbody>
                         {freelancers.map(f => (
                             <tr key={f.freelancer_id}>
+                                <td>{f.freelancer_id || 'N/A'}</td>
                                 <td>{f.freelancer_code || 'N/A'}</td>
                                 <td>{f.name}</td>
+                                <td>{f.email || 'N/A'}</td>
                                 <td>₹{f.hourly_rate}</td>
                                 <td>
                                     <span className={`badge badge-${f.status === 'active' ? 'success' : 'danger'}`}>
@@ -558,15 +574,19 @@ function FreelancersPage() {
                             ) : (
                                 sessions.map(s => (
                                     <tr key={s.session_id}>
-                                        <td>{new Date(s.session_date).toLocaleDateString()}</td>
-                                        <td>{new Date(s.login_time).toLocaleTimeString()}</td>
-                                        <td>{s.logout_time ? new Date(s.logout_time).toLocaleTimeString() : 'N/A'}</td>
+                                        <td>{formatDate(s.session_date)}</td>
+                                        <td>{formatTime(s.login_time)}</td>
+                                        <td>{s.logout_time ? formatTime(s.logout_time) : 'N/A'}</td>
                                         <td>{formatDuration(s.session_duration_minutes)}</td>
                                         <td style={{ fontWeight: 'bold', color: '#28a745' }}>
                                             {s.session_value ? `₹${parseFloat(s.session_value).toFixed(2)}` : s.is_complete ? '₹0.00' : 'N/A'}
                                         </td>
                                         <td style={{ maxWidth: '300px', wordWrap: 'break-word' }}>
-                                            {s.work_summary || <span style={{ color: '#999', fontStyle: 'italic' }}>No summary</span>}
+                                            {s.work_summary ? (
+                                                <span>{s.work_summary}</span>
+                                            ) : (
+                                                <span style={{ color: '#999', fontStyle: 'italic' }}>No summary</span>
+                                            )}
                                         </td>
                                         <td>
                                             <span className={`badge badge-${s.is_complete ? 'success' : 'warning'}`}>
@@ -605,6 +625,16 @@ function FreelancersPage() {
                                     type="text"
                                     value={newFreelancer.name}
                                     onChange={(e) => setNewFreelancer({...newFreelancer, name: e.target.value})}
+                                    required
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label>Email *</label>
+                                <input
+                                    type="email"
+                                    value={newFreelancer.email}
+                                    onChange={(e) => setNewFreelancer({...newFreelancer, email: e.target.value})}
+                                    placeholder="freelancer@example.com"
                                     required
                                 />
                             </div>

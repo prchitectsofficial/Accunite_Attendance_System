@@ -48,14 +48,8 @@ class AuthController {
 
             const user = users[0];
 
-            // For demo/development: allow plain text password 'admin123'
-            let isValid = false;
-            if (password === 'admin123' && user.username === 'admin') {
-                isValid = true;
-            } else {
-                // Verify hashed password
-                isValid = await bcrypt.compare(password, user.password_hash);
-            }
+            // Verify hashed password
+            const isValid = await bcrypt.compare(password, user.password_hash);
 
             if (!isValid) {
                 return res.status(401).json({

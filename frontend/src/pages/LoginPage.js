@@ -19,31 +19,36 @@ function LoginPage() {
 
 const checkPortalAuth = async () => {
     try {
-        // Try to check portal auth cookie
+        // Skip portal auth check in local development
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+            console.log('Local development - skipping portal auth check');
+            setCheckingPortalAuth(false);
+            return;
+        }
+
+        // Only check portal auth in production
         const response = await authAPI.checkPortalAuth();
         
-        // Only auto-login if authenticated AND has employee_code
         if (response.data.authenticated && response.data.employee_code) {
             console.log('Portal auth detected, auto-login for:', response.data.employee_code);
             
-            // Auto-login with employee code
             const loginResponse = await authAPI.portalLogin(response.data.employee_code);
             const { token, user } = loginResponse.data;
 
             localStorage.setItem('token', token);
             localStorage.setItem('user', JSON.stringify(user));
 
-            navigate('/dashboard');
+            // Redirect to /attendance for employees (not /dashboard)
+            navigate('/attendance');
         } else {
-            // No portal auth or no employee - show normal login form
             setCheckingPortalAuth(false);
         }
     } catch (err) {
-        // Portal auth check failed - that's OK, show normal login form
         console.log('No portal auth, showing login form');
         setCheckingPortalAuth(false);
     }
 };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
@@ -225,11 +230,6 @@ const checkPortalAuth = async () => {
                     </button>
                 </form>
 
-                {loginType === 'admin' && (
-                    <div style={{ marginTop: '20px', textAlign: 'center', fontSize: '12px', color: '#666' }}>
-                        Default: admin / admin123
-                    </div>
-                )}
             </div>
         </div>
     );

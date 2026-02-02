@@ -14,6 +14,7 @@ const freelancerRoutes = require('./routes/freelancerRoutes');
 const attendanceRoutes = require('./routes/attendanceRoutes');
 const leaveRoutes = require('./routes/leaveRoutes');
 const reportRoutes = require('./routes/reportRoutes');
+const yearlyLeaveRoutes = require('./routes/yearlyLeaveRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -50,6 +51,7 @@ app.use('/api/freelancers', freelancerRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/leaves', leaveRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/yearly-leaves', yearlyLeaveRoutes);
 
 // 404 handler
 app.use((req, res) => {

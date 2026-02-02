@@ -1,18 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { employeeAPI, attendanceAPI } from '../services/api';
 
-// Helper function to get current date in IST timezone (UTC+5:30)
-const getISTDate = () => {
+// Helper function to get current date in local timezone (browser's timezone)
+const getLocalDate = () => {
     const now = new Date();
-    const istOffset = 5.5 * 60 * 60 * 1000; // 5.5 hours in milliseconds
-    const utcTime = now.getTime();
-    const istTime = new Date(utcTime + istOffset);
-    return istTime.toISOString().split('T')[0];
+    // Get local date string in YYYY-MM-DD format
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
 };
 
 function AttendancePage() {
     const [employees, setEmployees] = useState([]);
-    const [selectedDate, setSelectedDate] = useState(getISTDate());
+    const [selectedDate, setSelectedDate] = useState(getLocalDate());
     const [attendanceRecords, setAttendanceRecords] = useState([]);
     const [message, setMessage] = useState({ type: '', text: '' });
     const [loading, setLoading] = useState(false);
@@ -110,9 +111,20 @@ function AttendancePage() {
     };
 
     const handleClockOut = async (employeeCode) => {
+        // Ask for work summary
+        const workSummary = window.prompt('Please enter work summary (required):');
+        if (workSummary === null) {
+            // User cancelled
+            return;
+        }
+        if (!workSummary || workSummary.trim() === '') {
+            showMessage('error', 'Work summary is required');
+            return;
+        }
+        
         setLoading(true);
         try {
-            await attendanceAPI.clockOut(employeeCode);
+            await attendanceAPI.clockOut(employeeCode, workSummary.trim());
             showMessage('success', 'Clocked out successfully');
             // Reload attendance immediately
             await loadAttendance();
@@ -156,12 +168,16 @@ function AttendancePage() {
     };
 
     const handleMarkPresent = async (employeeCode) => {
+        setLoading(true);
         try {
             await attendanceAPI.markAttendance(employeeCode, selectedDate, 'present', null);
             showMessage('success', 'Marked present successfully');
-            loadAttendance();
+            // Reload attendance to update status
+            await loadAttendance();
         } catch (error) {
             showMessage('error', error.response?.data?.message || 'Failed to mark attendance');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -185,6 +201,11 @@ function AttendancePage() {
     const isClockedIn = (employeeCode) => {
         const record = getAttendanceRecord(employeeCode);
         return record && record.clock_in_time && !record.clock_out_time;
+    };
+
+    const isClockedOut = (employeeCode) => {
+        const record = getAttendanceRecord(employeeCode);
+        return record && record.clock_out_time;
     };
 
     const isOnBreak = (employeeCode) => {
@@ -227,7 +248,7 @@ function AttendancePage() {
     };
 
     const getMaxDate = () => {
-        return getISTDate();
+        return getLocalDate();
     };
 
     const getStatusBadge = (status) => {
@@ -292,7 +313,7 @@ function AttendancePage() {
                             value={selectedDate}
                             onChange={(e) => {
                                 const selected = e.target.value;
-                                const today = new Date().toISOString().split('T')[0];
+                                const today = getLocalDate(); // Use local date, not UTC
                                 if (selected > today) {
                                     showMessage('error', 'Cannot view attendance for future dates');
                                     return;
@@ -394,16 +415,40 @@ function AttendancePage() {
                                             {canTakeAction(record.employee_code) ? (
                                                 <>
                                                     {attendanceType && attendanceType.toLowerCase() === 'non-clocking' ? (
-                                                        <button 
-                                                            className="btn btn-sm btn-success"
-                                                            onClick={() => handleMarkPresent(record.employee_code)}
-                                                            style={{ padding: '4px 8px', fontSize: '11px', lineHeight: '1.2' }}
-                                                        >
-                                                            Mark Present
-                                                        </button>
+                                                        record.status === 'present' ? (
+                                                            <span style={{ 
+                                                                color: '#28a745', 
+                                                                fontSize: '12px',
+                                                                fontWeight: '500',
+                                                                padding: '4px 8px',
+                                                                backgroundColor: '#d4edda',
+                                                                borderRadius: '4px',
+                                                                display: 'inline-block'
+                                                            }}>
+                                                                Marked
+                                                            </span>
+                                                        ) : (
+                                                            <button 
+                                                                className="btn btn-sm btn-success"
+                                                                onClick={() => handleMarkPresent(record.employee_code)}
+                                                                disabled={loading}
+                                                                style={{ padding: '4px 8px', fontSize: '11px', lineHeight: '1.2' }}
+                                                            >
+                                                                Mark Present
+                                                            </button>
+                                                        )
                                                     ) : attendanceType && attendanceType.toLowerCase() === 'clocking' ? (
-                                                        <div style={{ display: 'flex', gap: '3px', flexWrap: 'nowrap' }}>
-                                                            {!clockedIn ? (
+                                                        <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap' }}>
+                                                            {isClockedOut(record.employee_code) ? (
+                                                                <button 
+                                                                    className="btn btn-sm btn-success"
+                                                                    disabled={true}
+                                                                    style={{ padding: '4px 8px', fontSize: '11px', lineHeight: '1.2', whiteSpace: 'nowrap', opacity: 0.6, cursor: 'not-allowed' }}
+                                                                    title="Already clocked out for today"
+                                                                >
+                                                                    Clock In (Disabled)
+                                                                </button>
+                                                            ) : !clockedIn ? (
                                                                 <button 
                                                                     className="btn btn-sm btn-success"
                                                                     onClick={() => handleClockIn(record.employee_code)}
@@ -413,17 +458,53 @@ function AttendancePage() {
                                                                     Clock In
                                                                 </button>
                                                             ) : (
-                                                                <span style={{ 
-                                                                    color: '#666', 
-                                                                    fontSize: '12px',
-                                                                    fontWeight: '500',
-                                                                    padding: '4px 8px',
-                                                                    backgroundColor: '#f0f0f0',
-                                                                    borderRadius: '4px',
-                                                                    display: 'inline-block'
-                                                                }}>
-                                                                    Clocked In ({formatTime(record.clock_in_time)})
-                                                                </span>
+                                                                <>
+                                                                    {!record.clock_out_time ? (
+                                                                        <>
+                                                                            {!onBreak ? (
+                                                                                <>
+                                                                                    <button 
+                                                                                        className="btn btn-sm btn-warning"
+                                                                                        onClick={() => handleBreakStart(record.employee_code)}
+                                                                                        disabled={loading}
+                                                                                        style={{ padding: '4px 8px', fontSize: '11px', lineHeight: '1.2', whiteSpace: 'nowrap' }}
+                                                                                    >
+                                                                                        Start Break
+                                                                                    </button>
+                                                                                    <button 
+                                                                                        className="btn btn-sm btn-danger"
+                                                                                        onClick={() => handleClockOut(record.employee_code)}
+                                                                                        disabled={loading}
+                                                                                        style={{ padding: '4px 8px', fontSize: '11px', lineHeight: '1.2', whiteSpace: 'nowrap' }}
+                                                                                    >
+                                                                                        Clock Out
+                                                                                    </button>
+                                                                                </>
+                                                                            ) : (
+                                                                                <button 
+                                                                                    className="btn btn-sm btn-info"
+                                                                                    onClick={() => handleBreakStop(record.employee_code)}
+                                                                                    disabled={loading}
+                                                                                    style={{ padding: '4px 8px', fontSize: '11px', lineHeight: '1.2', whiteSpace: 'nowrap' }}
+                                                                                >
+                                                                                    End Break
+                                                                                </button>
+                                                                            )}
+                                                                        </>
+                                                                    ) : (
+                                                                        <span style={{ 
+                                                                            color: '#28a745', 
+                                                                            fontSize: '12px',
+                                                                            fontWeight: '500',
+                                                                            padding: '4px 8px',
+                                                                            backgroundColor: '#d4edda',
+                                                                            borderRadius: '4px',
+                                                                            display: 'inline-block'
+                                                                        }}>
+                                                                            Completed
+                                                                        </span>
+                                                                    )}
+                                                                </>
                                                             )}
                                                         </div>
                                                     ) : null}

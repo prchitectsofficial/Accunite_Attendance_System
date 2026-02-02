@@ -30,26 +30,43 @@ class SalarySlipService {
         // Get leave usage for the month
         const leaveUsage = await this.getLeaveUsageForMonth(employeeCode, startDate, endDate);
 
-        // Calculate working days
+        // Calculate working days (excluding weekends for attendance calculation)
         const totalDays = lastDay;
         const workingDays = this.calculateWorkingDays(startDate, endDate);
+        const weekOffs = totalDays - workingDays; // Saturday and Sunday count
+        
+        // Count present days and leave days from attendance records
         const presentDays = attendanceRecords.filter(r => r.status === 'present').length;
         const leaveDays = leaveUsage.leave_days || 0;
-        const unpaidLeaveDays = workingDays - presentDays - leaveDays;
+        
+        // Calculate unpaid leave days: working days where employee was neither present nor on paid leave
+        // This includes:
+        // 1. Explicitly marked 'absent' days (not counted in presentDays)
+        // 2. Working days with no attendance record (not present, not on paid leave)
+        // Formula: total working days - present days - paid leave days = unpaid leave days
+        let unpaidLeaveDays = workingDays - presentDays - leaveDays;
         if (unpaidLeaveDays < 0) unpaidLeaveDays = 0;
 
         // Get employee salary (base salary)
         const baseSalary = parseFloat(employee.salary) || 0;
 
-        // Calculate salary components (assuming 50% basic, 25% HRA, 15% personal allowance, 10% conveyance)
+        // Calculate salary components:
+        // Basic: 50% of salary
+        // Conveyance: ₹2000 (hardcoded for each employee)
+        // HRA: 50% of basic salary
+        // PA: Balance amount (remaining after Basic + Conveyance + HRA)
         const basic = Math.round(baseSalary * 0.50);
-        const houseRentAllowance = Math.round(baseSalary * 0.25);
-        const personalAllowance = Math.round(baseSalary * 0.15);
-        const conveyance = Math.round(baseSalary * 0.10);
+        const conveyance = 2000; // Hardcoded ₹2000 for each employee
+        const houseRentAllowance = Math.round(basic * 0.50); // 50% of basic
+        const personalAllowance = baseSalary - basic - conveyance - houseRentAllowance; // Balance amount
 
         // Calculate deductions based on unpaid leave
-        const dailySalary = baseSalary / workingDays;
-        const totalDeduction = Math.round(unpaidLeaveDays * dailySalary);
+        // IMPORTANT: Since weekends (Sat/Sun) are paid week offs, salary is based on total days
+        // But deductions should only be for unpaid working days
+        // Daily working day salary = baseSalary / workingDays (not totalDays)
+        const dailyWorkingDaySalary = baseSalary / workingDays;
+        const unpaidLeaveDeduction = Math.round(unpaidLeaveDays * dailyWorkingDaySalary);
+        const totalDeduction = unpaidLeaveDeduction;
 
         // Calculate net salary
         const totalEarning = basic + houseRentAllowance + personalAllowance + conveyance;
@@ -62,8 +79,8 @@ class SalarySlipService {
         return {
             employee_code: employee.employee_code,
             employee_name: employee.name,
-            designation: employee.designation || 'Employee', // You may need to add this field to employees table
-            date_of_joining: employee.date_of_joining || null, // You may need to add this field
+            designation: employee.designation || 'Employee',
+            date_of_joining: employee.date_of_joining || null,
             bank_name: employee.bank_name || null, // You may need to add this field
             ifsc: employee.ifsc || null, // You may need to add this field
             bank_account_number: employee.bank_account_number || null, // You may need to add this field
@@ -76,6 +93,8 @@ class SalarySlipService {
             total_earning: totalEarning,
             paid_leave: leaveDays,
             unpaid_leave: unpaidLeaveDays,
+            paid_leave_deduction: 0, // Paid leave is not deducted
+            unpaid_leave_deduction: unpaidLeaveDeduction,
             total_deduction: totalDeduction,
             net_salary: netSalary,
             leave_remaining: leaveRemaining,
@@ -84,7 +103,8 @@ class SalarySlipService {
             year: year,
             present_days: presentDays,
             total_days: totalDays,
-            working_days: workingDays
+            working_days: workingDays,
+            week_offs: weekOffs // Saturday and Sunday count
         };
     }
 

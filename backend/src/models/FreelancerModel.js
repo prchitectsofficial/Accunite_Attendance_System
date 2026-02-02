@@ -10,18 +10,61 @@ class FreelancerModel {
      * Get all active freelancers
      */
     static async getAll() {
-        const [rows] = await promisePool.query(
-            "SELECT id as freelancer_id, freelancer_code, name, email, password_hash, password_plain, hourly_rate, status FROM freelancers WHERE status = 'active' ORDER BY COALESCE(name, '')"
-        );
-        return rows;
+        try {
+            // Select only columns that exist in base schema
+            // Check if freelancer_code and email columns exist
+            const [columnCheck] = await promisePool.query(
+                `SELECT COLUMN_NAME 
+                FROM INFORMATION_SCHEMA.COLUMNS 
+                WHERE TABLE_SCHEMA = DATABASE() 
+                AND TABLE_NAME = 'freelancers' 
+                AND COLUMN_NAME IN ('freelancer_code', 'email')`
+            );
+            const hasFreelancerCode = columnCheck.some(c => c.COLUMN_NAME === 'freelancer_code');
+            const hasEmail = columnCheck.some(c => c.COLUMN_NAME === 'email');
+            
+            // Build query based on available columns
+            let selectFields = 'freelancer_id, name, hourly_rate, status';
+            if (hasFreelancerCode) selectFields += ', freelancer_code';
+            if (hasEmail) selectFields += ', email';
+            
+            const [rows] = await promisePool.query(
+                `SELECT ${selectFields}
+                FROM freelancers 
+                WHERE status = 'active' 
+                ORDER BY COALESCE(name, '')`
+            );
+            return rows;
+        } catch (error) {
+            console.error('Error getting freelancers:', error);
+            throw error;
+        }
     }
 
     /**
      * Get freelancer by ID
      */
     static async getById(freelancerId) {
+        // Check if freelancer_code and email columns exist
+        const [columnCheck] = await promisePool.query(
+            `SELECT COLUMN_NAME 
+            FROM INFORMATION_SCHEMA.COLUMNS 
+            WHERE TABLE_SCHEMA = DATABASE() 
+            AND TABLE_NAME = 'freelancers' 
+            AND COLUMN_NAME IN ('freelancer_code', 'email')`
+        );
+        const hasFreelancerCode = columnCheck.some(c => c.COLUMN_NAME === 'freelancer_code');
+        const hasEmail = columnCheck.some(c => c.COLUMN_NAME === 'email');
+        
+        // Build query based on available columns
+        let selectFields = 'freelancer_id, name, hourly_rate, status';
+        if (hasFreelancerCode) selectFields += ', freelancer_code';
+        if (hasEmail) selectFields += ', email';
+        
         const [rows] = await promisePool.query(
-            "SELECT id as freelancer_id, freelancer_code, name, email, password_hash, password_plain, hourly_rate, status FROM freelancers WHERE id = ? AND status = 'active'",
+            `SELECT ${selectFields}
+            FROM freelancers 
+            WHERE freelancer_id = ? AND status = 'active'`,
             [freelancerId]
         );
         return rows[0];
@@ -31,13 +74,37 @@ class FreelancerModel {
      * Create new freelancer
      */
     static async create(freelancerData) {
-        const { name, hourly_rate, freelancer_code } = freelancerData;
+        const { name, hourly_rate, freelancer_code, email } = freelancerData;
 
-        // Only insert name, hourly_rate, and freelancer_code initially
-        // Email and password can be assigned later via credential assignment
+        // Check which columns exist in the database
+        const [columnCheck] = await promisePool.query(
+            `SELECT COLUMN_NAME 
+            FROM INFORMATION_SCHEMA.COLUMNS 
+            WHERE TABLE_SCHEMA = DATABASE() 
+            AND TABLE_NAME = 'freelancers' 
+            AND COLUMN_NAME IN ('freelancer_code', 'email')`
+        );
+        const hasFreelancerCode = columnCheck.some(c => c.COLUMN_NAME === 'freelancer_code');
+        const hasEmail = columnCheck.some(c => c.COLUMN_NAME === 'email');
+
+        // Build dynamic query based on available columns
+        const columns = ['name', 'hourly_rate'];
+        const values = [name, hourly_rate];
+        
+        if (hasFreelancerCode && freelancer_code) {
+            columns.push('freelancer_code');
+            values.push(freelancer_code);
+        }
+        
+        if (hasEmail && email) {
+            columns.push('email');
+            values.push(email);
+        }
+
+        const placeholders = columns.map(() => '?').join(', ');
         const [result] = await promisePool.query(
-            'INSERT INTO freelancers (name, hourly_rate, freelancer_code) VALUES (?, ?, ?)',
-            [name, hourly_rate, freelancer_code]
+            `INSERT INTO freelancers (${columns.join(', ')}) VALUES (${placeholders})`,
+            values
         );
 
         return this.getById(result.insertId);
@@ -65,7 +132,7 @@ class FreelancerModel {
         values.push(freelancerId);
 
         const [result] = await promisePool.query(
-            `UPDATE freelancers SET ${fields.join(', ')} WHERE id = ?`,
+            `UPDATE freelancers SET ${fields.join(', ')} WHERE freelancer_id = ?`,
             values
         );
 
@@ -80,11 +147,20 @@ class FreelancerModel {
      * Get freelancer by email
      */
     static async getByEmail(email) {
-        const [rows] = await promisePool.query(
-            "SELECT id as freelancer_id, freelancer_code, name, email, password_hash, password_plain, hourly_rate, status FROM freelancers WHERE email = ? AND status = 'active'",
-            [email]
-        );
-        return rows[0];
+        try {
+            const [rows] = await promisePool.query(
+                "SELECT freelancer_id, name, hourly_rate, status FROM freelancers WHERE email = ? AND status = 'active'",
+                [email]
+            );
+            return rows[0];
+        } catch (error) {
+            // If email column doesn't exist, return null
+            if (error.code === 'ER_BAD_FIELD_ERROR') {
+                console.warn('Email column does not exist in freelancers table');
+                return null;
+            }
+            throw error;
+        }
     }
 
     /**
@@ -92,7 +168,7 @@ class FreelancerModel {
      */
     static async delete(freelancerId) {
         const [result] = await promisePool.query(
-            'UPDATE freelancers SET status = ? WHERE id = ?',
+            'UPDATE freelancers SET status = ? WHERE freelancer_id = ?',
             ['inactive', freelancerId]
         );
 
@@ -169,7 +245,7 @@ class FreelancerModel {
                 fs.*,
                 ROUND(fs.session_duration_minutes / 60.0 * f.hourly_rate, 2) as session_value
             FROM freelancer_sessions fs
-            INNER JOIN freelancers f ON fs.freelancer_id = f.id
+            INNER JOIN freelancers f ON fs.freelancer_id = f.freelancer_id
             WHERE fs.session_id = ?`,
             [sessionId]
         );
@@ -186,7 +262,7 @@ class FreelancerModel {
                 fs.*,
                 ROUND(fs.session_duration_minutes / 60.0 * f.hourly_rate, 2) as session_value
             FROM freelancer_sessions fs
-            INNER JOIN freelancers f ON fs.freelancer_id = f.id
+            INNER JOIN freelancers f ON fs.freelancer_id = f.freelancer_id
             WHERE fs.freelancer_id = ?
         `;
         const params = [freelancerId];

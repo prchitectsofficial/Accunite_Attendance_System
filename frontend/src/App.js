@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, Link, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, Link, useNavigate, useLocation } from 'react-router-dom';
+import { authAPI } from './services/api';
 import './styles/App.css';
 
 // Pages
@@ -64,18 +65,74 @@ function Navbar({ onLogout }) {
     );
 }
 
-function App() {
+// Inner App component that uses useLocation
+function AppContent() {
     const [user, setUser] = useState(null);
+    const [checkingPortalAuth, setCheckingPortalAuth] = useState(false);
+    const location = useLocation();
 
     useEffect(() => {
         // Check if user is logged in
-        const storedUser = localStorage.getItem('user');
-        const storedToken = localStorage.getItem('token');
+        const checkUser = async () => {
+            const storedUser = localStorage.getItem('user');
+            const storedToken = localStorage.getItem('token');
+            
+            // If user is already logged in, set user state
+            if (storedUser && storedToken) {
+                try {
+                    setUser(JSON.parse(storedUser));
+                } catch (e) {
+                    console.error('Error parsing user from localStorage:', e);
+                    setUser(null);
+                }
+            } else {
+                // If not logged in, check for portal SSO (only in production, not localhost)
+                if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+                    setCheckingPortalAuth(true);
+                    try {
+                        const response = await authAPI.checkPortalAuth();
+                        
+                        if (response.data.authenticated && response.data.employee_code) {
+                            console.log('Portal SSO detected, auto-login for:', response.data.employee_code);
+                            
+                            const loginResponse = await authAPI.portalLogin(response.data.employee_code);
+                            const { token, user: portalUser } = loginResponse.data;
+
+                            localStorage.setItem('token', token);
+                            localStorage.setItem('user', JSON.stringify(portalUser));
+                            setUser(portalUser);
+                            
+                            // If on login page or root, redirect to attendance
+                            if (location.pathname === '/login' || location.pathname === '/') {
+                                window.location.href = '/attendance';
+                            }
+                        }
+                    } catch (err) {
+                        console.log('No portal SSO, user needs to login normally');
+                    } finally {
+                        setCheckingPortalAuth(false);
+                    }
+                } else {
+                    setUser(null);
+                }
+            }
+        };
+
+        // Check on mount and whenever location changes
+        checkUser();
+
+        // Also listen for storage changes (in case login happens in another tab)
+        const handleStorageChange = () => {
+            checkUser();
+        };
+
+        window.addEventListener('storage', handleStorageChange);
         
-        if (storedUser && storedToken) {
-            setUser(JSON.parse(storedUser));
-        }
-    }, []);
+        // Check user on every route change
+        return () => {
+            window.removeEventListener('storage', handleStorageChange);
+        };
+    }, [location]);
 
     const handleLogout = () => {
         localStorage.removeItem('token');
@@ -84,11 +141,17 @@ function App() {
         window.location.href = '/login';
     };
 
+    // Check localStorage directly for navbar display (more reliable)
+    const hasUser = () => {
+        const storedUser = localStorage.getItem('user');
+        const storedToken = localStorage.getItem('token');
+        return storedUser && storedToken;
+    };
+
     return (
-        <Router>
-            <div className="app">
-                {user && <Navbar onLogout={handleLogout} />}
-                <div className="main-content">
+        <div className="app">
+            {hasUser() && <Navbar onLogout={handleLogout} />}
+            <div className="main-content">
                     <Routes>
                         <Route path="/login" element={<LoginPage />} />
                         <Route 
@@ -169,6 +232,14 @@ function App() {
                     </Routes>
                 </div>
             </div>
+    );
+}
+
+// Main App component with Router
+function App() {
+    return (
+        <Router>
+            <AppContent />
         </Router>
     );
 }

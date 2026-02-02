@@ -34,27 +34,64 @@ class EmployeeModel {
         const {
             employee_code,
             name,
+            designation,
             email,
             salary,
             attendance_type,
             leave_balance,
-            leave_allotted
+            leave_allotted,
+            date_of_joining,
+            bank_name,
+            ifsc,
+            bank_account_number,
+            aadhaar_number,
+            pan
         } = employeeData;
 
-        // Only include essential fields - clock times can be added later via update
+        // Build dynamic query for optional fields
+        const fields = ['employee_code', 'name', 'designation', 'email', 'salary', 'attendance_type', 'leave_balance', 'leave_allotted', 'status'];
+        const values = [
+            employee_code,
+            name,
+            designation || null,
+            email || null,
+            salary || null,
+            attendance_type || 'clocking',
+            leave_balance || 0,
+            leave_allotted || 0,
+            'active'
+        ];
+
+        // Add optional fields if they exist
+        if (date_of_joining !== undefined) {
+            fields.push('date_of_joining');
+            values.push(date_of_joining || null);
+        }
+        if (bank_name !== undefined) {
+            fields.push('bank_name');
+            values.push(bank_name || null);
+        }
+        if (ifsc !== undefined) {
+            fields.push('ifsc');
+            values.push(ifsc || null);
+        }
+        if (bank_account_number !== undefined) {
+            fields.push('bank_account_number');
+            values.push(bank_account_number || null);
+        }
+        if (aadhaar_number !== undefined) {
+            fields.push('aadhaar_number');
+            values.push(aadhaar_number || null);
+        }
+        if (pan !== undefined) {
+            fields.push('pan');
+            values.push(pan || null);
+        }
+
+        const placeholders = fields.map(() => '?').join(', ');
         const [result] = await promisePool.query(
-            `INSERT INTO employees 
-            (employee_code, name, email, salary, attendance_type, leave_balance, leave_allotted, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'active')`,
-            [
-                employee_code,
-                name,
-                email || null,
-                salary || null,
-                attendance_type || 'clocking',
-                leave_balance || 0,
-                leave_allotted || 0
-            ]
+            `INSERT INTO employees (${fields.join(', ')}) VALUES (${placeholders})`,
+            values
         );
 
         return this.getByCode(employee_code);
@@ -65,8 +102,8 @@ class EmployeeModel {
      */
     static async update(employeeCode, updateData) {
         const allowed = [
-            'name', 'email', 'password_hash', 'password_plain', 'salary', 'attendance_type', 'clock_start_time', 'clock_end_time', 'grace_period_minutes',
-            'leave_balance', 'leave_allotted', 'status'
+            'name', 'designation', 'email', 'password_hash', 'password_plain', 'salary', 'attendance_type', 'clock_start_time', 'clock_end_time', 'grace_period_minutes',
+            'leave_balance', 'leave_allotted', 'status', 'date_of_joining', 'bank_name', 'ifsc', 'bank_account_number', 'aadhaar_number', 'pan'
         ];
 
         const fields = [];

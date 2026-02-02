@@ -32,14 +32,19 @@ class AttendanceModel {
         const today = moment().format('YYYY-MM-DD');
         const now = new Date();
 
-        // Check if already clocked in today
+        // Check if already clocked in today or clocked out today
         const [existing] = await promisePool.query(
             'SELECT * FROM attendance_records WHERE employee_code = ? AND attendance_date = ?',
             [employeeCode, today]
         );
 
-        if (existing.length > 0 && existing[0].clock_in_time) {
-            throw new Error('Already clocked in today');
+        if (existing.length > 0) {
+            if (existing[0].clock_out_time) {
+                throw new Error('Already clocked out for today. Clock in will be available tomorrow.');
+            }
+            if (existing[0].clock_in_time) {
+                throw new Error('Already clocked in today');
+            }
         }
 
         // Check if late (only for regular working days)
@@ -85,7 +90,7 @@ class AttendanceModel {
     /**
      * Clock out for clocking employees
      */
-    static async clockOut(employeeCode) {
+    static async clockOut(employeeCode, workSummary = null) {
         const today = moment().format('YYYY-MM-DD');
         const now = new Date();
 
@@ -110,14 +115,19 @@ class AttendanceModel {
         // Calculate total working minutes (excluding breaks)
         let totalWorkingMinutes = clockOut.diff(clockIn, 'minutes');
         
-        // Subtract break time if break was taken
-        let breakMinutes = 0;
-        if (record.break_start_time && record.break_stop_time) {
-            breakMinutes = moment(record.break_stop_time).diff(moment(record.break_start_time), 'minutes');
-            // Only subtract break if it's more than 30 minutes
-            if (breakMinutes > 30) {
-                totalWorkingMinutes -= breakMinutes;
-            }
+        // Subtract cumulative break time (supports multiple breaks)
+        let totalBreakMinutes = record.total_break_minutes || 0;
+        
+        // If there's an active break (started but not stopped), calculate and add it
+        if (record.break_start_time && !record.break_stop_time) {
+            const activeBreakMinutes = moment(now).diff(moment(record.break_start_time), 'minutes');
+            totalBreakMinutes += activeBreakMinutes;
+        }
+        
+        // Subtract total break time from working minutes
+        // Only subtract if total break is more than 30 minutes
+        if (totalBreakMinutes > 30) {
+            totalWorkingMinutes -= totalBreakMinutes;
         }
         
         // Calculate late time or overtime (570 minutes = 9.5 hours standard)
@@ -131,14 +141,23 @@ class AttendanceModel {
             overtimeMinutes = totalWorkingMinutes - STANDARD_WORKING_MINUTES;
         }
 
+        // Build update query - only include columns that exist
+        const updateFields = ['clock_out_time = ?', 'total_working_minutes = ?', 'late_minutes = ?', 'overtime_minutes = ?'];
+        const updateValues = [now, totalWorkingMinutes, lateMinutes, overtimeMinutes];
+        
+        // Add work summary if provided (check if column exists)
+        if (workSummary) {
+            updateFields.push('notes = ?');
+            updateValues.push(workSummary);
+        }
+        
+        updateValues.push(record.id);
+        
         const [result] = await promisePool.query(
             `UPDATE attendance_records 
-            SET clock_out_time = ?, 
-                total_working_minutes = ?,
-                late_minutes = ?,
-                overtime_minutes = ?
+            SET ${updateFields.join(', ')}
             WHERE id = ?`,
-            [now, totalWorkingMinutes, lateMinutes, overtimeMinutes, record.id]
+            updateValues
         );
 
         // Return updated record from getAllAttendanceByDate to ensure status is correct
@@ -149,6 +168,7 @@ class AttendanceModel {
 
     /**
      * Mark break start
+     * Allows multiple breaks per day
      */
     static async breakStart(employeeCode) {
         const today = moment().format('YYYY-MM-DD');
@@ -164,10 +184,16 @@ class AttendanceModel {
             throw new Error('No clock-in record found for today');
         }
 
-        if (records[0].break_start_time && !records[0].break_stop_time) {
-            throw new Error('Break already started');
+        if (records[0].clock_out_time) {
+            throw new Error('Cannot start break after clocking out');
         }
 
+        // Allow multiple breaks - only check if current break is active
+        if (records[0].break_start_time && !records[0].break_stop_time) {
+            throw new Error('Break already started. Please end current break first.');
+        }
+
+        // Set break start time (can be multiple times per day)
         const [result] = await promisePool.query(
             'UPDATE attendance_records SET break_start_time = ? WHERE id = ?',
             [now, records[0].id]
@@ -181,6 +207,8 @@ class AttendanceModel {
 
     /**
      * Mark break stop
+     * Calculates break duration and adds to cumulative total_break_minutes
+     * Supports multiple breaks per day
      */
     static async breakStop(employeeCode) {
         const today = moment().format('YYYY-MM-DD');
@@ -204,9 +232,28 @@ class AttendanceModel {
             throw new Error('Break already stopped');
         }
 
+        const record = records[0];
+        const breakStart = moment(record.break_start_time);
+        const breakStop = moment(now);
+        
+        // Calculate this break duration
+        const breakDuration = breakStop.diff(breakStart, 'minutes');
+        
+        // Get current cumulative break minutes (default to 0 if null)
+        const currentBreakMinutes = record.total_break_minutes || 0;
+        
+        // Add this break duration to cumulative total
+        const newTotalBreakMinutes = currentBreakMinutes + breakDuration;
+
+        // Update break_stop_time and cumulative total_break_minutes
+        // Reset break_start_time and break_stop_time for next break cycle
         const [result] = await promisePool.query(
-            'UPDATE attendance_records SET break_stop_time = ? WHERE id = ?',
-            [now, records[0].id]
+            `UPDATE attendance_records 
+            SET total_break_minutes = ?,
+                break_start_time = NULL,
+                break_stop_time = NULL
+            WHERE id = ?`,
+            [newTotalBreakMinutes, record.id]
         );
 
         // Return updated record from getAllAttendanceByDate to ensure status is correct

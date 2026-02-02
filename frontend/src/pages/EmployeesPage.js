@@ -35,10 +35,17 @@ function EmployeesPage() {
         setEditingEmployee({
             employee_code: '',
             name: '',
+            designation: '',
             email: '',
             salary: '',
             attendance_type: 'clocking',
-            leave_balance: 15
+            leave_balance: 15,
+            date_of_joining: '',
+            bank_name: '',
+            ifsc: '',
+            bank_account_number: '',
+            aadhaar_number: '',
+            pan: ''
         });
         setShowModal(true);
     };
@@ -152,6 +159,7 @@ function EmployeesPage() {
                         <tr>
                             <th>Employee Code</th>
                             <th>Name</th>
+                            <th>Designation</th>
                             <th>Type</th>
                             <th>Leave Balance</th>
                             <th>Status</th>
@@ -163,6 +171,7 @@ function EmployeesPage() {
                             <tr key={emp.employee_code}>
                                 <td>{emp.employee_code}</td>
                                 <td>{emp.name}</td>
+                                <td>{emp.designation || '-'}</td>
                                 <td>{emp.attendance_type}</td>
                                 <td>{emp.leave_balance || 0}</td>
                                 <td>
@@ -216,6 +225,15 @@ function EmployeesPage() {
                                 />
                             </div>
                             <div className="form-group">
+                                <label>Designation</label>
+                                <input
+                                    type="text"
+                                    value={editingEmployee.designation || ''}
+                                    onChange={(e) => setEditingEmployee({...editingEmployee, designation: e.target.value})}
+                                    placeholder="e.g., Software Engineer, Manager, etc."
+                                />
+                            </div>
+                            <div className="form-group">
                                 <label>Email</label>
                                 <input
                                     type="email"
@@ -250,7 +268,66 @@ function EmployeesPage() {
                                     onChange={(e) => setEditingEmployee({...editingEmployee, leave_balance: e.target.value})}
                                 />
                             </div>
-                            <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>
+                            <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '2px solid #eee' }}>
+                                <h3 style={{ marginBottom: '15px', fontSize: '16px', color: '#333' }}>Additional Information</h3>
+                                <div className="form-group">
+                                    <label>Date of Joining</label>
+                                    <input
+                                        type="date"
+                                        value={editingEmployee.date_of_joining || ''}
+                                        onChange={(e) => setEditingEmployee({...editingEmployee, date_of_joining: e.target.value})}
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label>Bank Name</label>
+                                    <input
+                                        type="text"
+                                        value={editingEmployee.bank_name || ''}
+                                        onChange={(e) => setEditingEmployee({...editingEmployee, bank_name: e.target.value})}
+                                        placeholder="e.g., HDFC Bank, SBI, etc."
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label>IFSC Code</label>
+                                    <input
+                                        type="text"
+                                        value={editingEmployee.ifsc || ''}
+                                        onChange={(e) => setEditingEmployee({...editingEmployee, ifsc: e.target.value.toUpperCase()})}
+                                        placeholder="e.g., HDFC0001234"
+                                        maxLength="11"
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label>Bank Account Number</label>
+                                    <input
+                                        type="text"
+                                        value={editingEmployee.bank_account_number || ''}
+                                        onChange={(e) => setEditingEmployee({...editingEmployee, bank_account_number: e.target.value})}
+                                        placeholder="Account number"
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label>Aadhaar Number</label>
+                                    <input
+                                        type="text"
+                                        value={editingEmployee.aadhaar_number || ''}
+                                        onChange={(e) => setEditingEmployee({...editingEmployee, aadhaar_number: e.target.value.replace(/\D/g, '').slice(0, 12)})}
+                                        placeholder="12-digit Aadhaar number"
+                                        maxLength="12"
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label>PAN (Permanent Account Number)</label>
+                                    <input
+                                        type="text"
+                                        value={editingEmployee.pan || ''}
+                                        onChange={(e) => setEditingEmployee({...editingEmployee, pan: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10)})}
+                                        placeholder="e.g., ABCDE1234F"
+                                        maxLength="10"
+                                    />
+                                </div>
+                            </div>
+                            <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '20px' }}>
                                 Save Employee
                             </button>
                         </form>

@@ -86,7 +86,7 @@ export const freelancerAPI = {
 export const attendanceAPI = {
     clockIn: (employeeCode, isOffDay = false) => 
         api.post('/attendance/clock-in', { employee_code: employeeCode }, { params: { is_off_day: isOffDay } }),
-    clockOut: (employeeCode) => api.post('/attendance/clock-out', { employee_code: employeeCode }),
+    clockOut: (employeeCode, workSummary) => api.post('/attendance/clock-out', { employee_code: employeeCode, work_summary: workSummary }),
     breakStart: (employeeCode) => api.post('/attendance/break-start', { employee_code: employeeCode }),
     breakStop: (employeeCode) => api.post('/attendance/break-stop', { employee_code: employeeCode }),
     markAttendance: (employeeCode, date, status, notes) => 
@@ -134,6 +134,12 @@ export const reportAPI = {
         api.get('/reports/late-arrivals', { params: { start_date: startDate, end_date: endDate } }),
     getLeaveUsage: (startDate, endDate) => 
         api.get('/reports/leave-usage', { params: { start_date: startDate, end_date: endDate } })
+};
+
+// Yearly Leave API
+export const yearlyLeaveAPI = {
+    allocate: (year) => api.post('/yearly-leaves/allocate', { year }),
+    checkStatus: (year) => api.get('/yearly-leaves/status', { params: { year } })
 };
 
 export default api;

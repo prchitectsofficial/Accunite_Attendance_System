@@ -60,16 +60,16 @@ class FreelancerController {
      */
     static async createFreelancer(req, res) {
         try {
-            const { name, hourly_rate, freelancer_code } = req.body;
+            const { name, hourly_rate, freelancer_code, email } = req.body;
 
-            if (!name || !hourly_rate || !freelancer_code) {
+            if (!name || !hourly_rate) {
                 return res.status(400).json({
                     error: 'Bad Request',
-                    message: 'Name, hourly rate, and freelancer code are required'
+                    message: 'Name and hourly rate are required'
                 });
             }
 
-            const freelancer = await FreelancerModel.create({ name, hourly_rate, freelancer_code });
+            const freelancer = await FreelancerModel.create({ name, hourly_rate, freelancer_code, email });
 
             res.status(201).json({
                 success: true,

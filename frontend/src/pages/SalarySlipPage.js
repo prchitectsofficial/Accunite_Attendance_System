@@ -10,8 +10,17 @@ function SalarySlipPage() {
     const currentYear = currentDate.getFullYear();
     const currentMonth = currentDate.getMonth() + 1;
     
-    const [selectedYear, setSelectedYear] = useState(currentYear);
-    const [selectedMonth, setSelectedMonth] = useState(currentMonth);
+    // Set default to previous month (only previous months are allowed)
+    const getPreviousMonth = () => {
+        if (currentMonth === 1) {
+            return { year: currentYear - 1, month: 12 };
+        }
+        return { year: currentYear, month: currentMonth - 1 };
+    };
+    
+    const previousMonth = getPreviousMonth();
+    const [selectedYear, setSelectedYear] = useState(previousMonth.year);
+    const [selectedMonth, setSelectedMonth] = useState(previousMonth.month);
     const [salarySlipData, setSalarySlipData] = useState(null);
     const [loadingSlip, setLoadingSlip] = useState(false);
     const [message, setMessage] = useState({ type: '', text: '' });
@@ -86,9 +95,10 @@ function SalarySlipPage() {
         const currentYear = currentDate.getFullYear();
         const currentMonth = currentDate.getMonth() + 1;
         
-        // Prevent selecting future months
-        if (selectedYear > currentYear || (selectedYear === currentYear && newMonth > currentMonth)) {
-            showMessage('error', 'Cannot view salary slip for future months');
+        // Prevent selecting current month and future months - only previous months allowed
+        if (selectedYear > currentYear || 
+            (selectedYear === currentYear && newMonth >= currentMonth)) {
+            showMessage('error', 'Can only view salary slip for previous months');
             return;
         }
         
@@ -104,9 +114,10 @@ function SalarySlipPage() {
         const currentYear = currentDate.getFullYear();
         const currentMonth = currentDate.getMonth() + 1;
         
-        // Prevent selecting future years or future months in current year
-        if (newYear > currentYear || (newYear === currentYear && selectedMonth > currentMonth)) {
-            showMessage('error', 'Cannot view salary slip for future months');
+        // Prevent selecting current month and future months - only previous months allowed
+        if (newYear > currentYear || 
+            (newYear === currentYear && selectedMonth >= currentMonth)) {
+            showMessage('error', 'Can only view salary slip for previous months');
             return;
         }
         
@@ -128,6 +139,16 @@ function SalarySlipPage() {
         printWindow.document.close();
         printWindow.focus();
         
+        // Set PDF filename: {Emp Name} salary slip {Month}
+        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
+                          'July', 'August', 'September', 'October', 'November', 'December'];
+        const monthName = monthNames[selectedMonth - 1] || 'Unknown';
+        const employeeName = salarySlipData.employee_name || 'Employee';
+        const filename = `${employeeName} salary slip ${monthName}`;
+        
+        // Set document title for PDF filename
+        printWindow.document.title = filename;
+        
         // Wait for content to load, then print
         setTimeout(() => {
             printWindow.print();
@@ -140,6 +161,8 @@ function SalarySlipPage() {
         const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
                           'July', 'August', 'September', 'October', 'November', 'December'];
         const monthName = monthNames[selectedMonth - 1] || 'Unknown';
+        const employeeName = data.employee_name || 'Employee';
+        const documentTitle = `${employeeName} salary slip ${monthName}`;
         
         const numberToWords = (num) => {
             if (!num || isNaN(num) || num < 0) return 'ZERO';
@@ -182,153 +205,208 @@ function SalarySlipPage() {
         return `<!DOCTYPE html>
 <html>
 <head>
-    <title>Salary Slip - ${data.employee_name}</title>
+    <title>${documentTitle}</title>
     <style>
         @media print { 
             body { margin: 0; padding: 0; }
             @page { margin: 0.5cm; size: A4; }
         }
-        * { box-sizing: border-box; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
         body { 
             font-family: 'Arial', 'Helvetica', sans-serif; 
             margin: 0;
-            padding: 15px;
+            padding: 20px;
             color: #000;
             background: #fff;
             font-size: 12px;
-            line-height: 1.5;
+            line-height: 1.6;
         }
         .header { 
-            background-color: #000; 
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
             color: #fff; 
-            padding: 25px 20px; 
+            padding: 30px 20px; 
             text-align: center;
-            margin-bottom: 20px;
+            margin-bottom: 25px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
         .header h1 { 
-            margin: 0 0 12px 0; 
-            font-size: 26px;
+            margin: 0 0 15px 0; 
+            font-size: 28px;
             font-weight: bold;
-            letter-spacing: 1px;
+            letter-spacing: 1.5px;
         }
         .header p { 
-            margin: 4px 0; 
-            font-size: 11px;
-            line-height: 1.6;
+            margin: 6px 0; 
+            font-size: 12px;
+            line-height: 1.8;
         }
         .payslip-title { 
             text-align: center; 
-            margin: 25px 0; 
-            font-size: 20px; 
+            margin: 30px 0; 
+            font-size: 22px; 
             font-weight: bold;
-            color: #000;
+            color: #1e3c72;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 1px;
+            padding: 10px;
+            background: #f0f4ff;
+            border-radius: 5px;
         }
         .employee-details { 
-            display: flex; 
-            justify-content: space-between; 
+            display: table;
+            width: 100%;
             margin-bottom: 25px;
-            padding: 15px;
-            background: #f9f9f9;
-            border: 1px solid #ddd;
+            border-collapse: collapse;
+            background: #fff;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .employee-details-row {
+            display: table-row;
         }
         .left-column, .right-column { 
-            width: 48%;
-            padding: 0 10px;
+            display: table-cell;
+            width: 50%;
+            padding: 20px;
+            vertical-align: top;
+            border-right: 1px solid #e0e0e0;
+        }
+        .right-column {
+            border-right: none;
         }
         .detail-row { 
-            margin-bottom: 10px; 
+            margin-bottom: 12px; 
             font-size: 13px;
-            line-height: 1.7;
-            display: flex;
-            align-items: flex-start;
+            line-height: 1.8;
+            display: table-row;
         }
         .detail-label { 
-            font-weight: bold; 
-            display: inline-block; 
-            width: 180px;
-            min-width: 180px;
+            font-weight: 600; 
+            display: table-cell;
+            width: 200px;
+            padding: 8px 10px 8px 0;
             color: #333;
+            vertical-align: top;
         }
         .detail-value {
-            flex: 1;
+            display: table-cell;
+            padding: 8px 0;
             color: #000;
+            vertical-align: top;
         }
-        .earnings-deductions { 
-            display: flex; 
-            justify-content: space-between; 
+        .salary-table-container {
             margin-top: 25px;
+            display: flex;
             gap: 20px;
         }
         .earnings, .deductions { 
-            width: 48%;
-            padding: 15px;
-            background: #f9f9f9;
-            border: 1px solid #ddd;
+            flex: 1;
+            background: #fff;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
         }
         .section-title { 
-            color: #0066cc; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
             font-weight: bold; 
             font-size: 16px; 
-            margin-bottom: 15px; 
-            border-bottom: 2px solid #0066cc; 
-            padding-bottom: 8px;
+            padding: 15px 20px;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 1px;
+            margin: 0;
+        }
+        .table-content {
+            padding: 15px 20px;
         }
         .amount-row { 
-            display: flex; 
-            justify-content: space-between; 
-            margin-bottom: 8px; 
-            font-size: 13px;
-            padding: 4px 0;
-            align-items: center;
+            display: table-row;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .amount-row:last-child {
+            border-bottom: none;
         }
         .amount-label { 
-            font-weight: 600;
+            display: table-cell;
+            font-weight: 500;
             color: #333;
+            padding: 10px 15px 10px 0;
+            font-size: 13px;
         }
         .amount-value { 
+            display: table-cell;
             text-align: right;
-            font-weight: 500;
+            font-weight: 600;
             color: #000;
             font-family: 'Courier New', monospace;
+            padding: 10px 0;
+            font-size: 13px;
         }
         .total-row { 
-            border-top: 2px solid #000; 
-            padding-top: 8px; 
-            margin-top: 12px; 
-            font-weight: bold;
-            font-size: 14px;
+            border-top: 3px solid #667eea; 
+            background: #f8f9ff;
+            margin-top: 10px;
         }
         .total-row .amount-label,
         .total-row .amount-value {
-            font-size: 14px;
+            font-size: 15px;
             font-weight: bold;
+            color: #1e3c72;
+            padding: 12px 15px 12px 0;
         }
-        .footer { 
-            margin-top: 40px; 
-            font-size: 10px; 
-            color: #666;
-            text-align: center;
-            font-style: italic;
-            padding-top: 15px;
-            border-top: 1px solid #ddd;
+        .total-row .amount-value {
+            padding: 12px 0;
         }
         .in-words-row {
             margin-top: 15px;
-            padding-top: 10px;
-            border-top: 1px solid #ccc;
-            font-size: 12px;
+            padding-top: 15px;
+            border-top: 2px solid #ddd;
+            background: #fffbf0;
         }
         .in-words-row .amount-label {
             font-weight: 600;
+            color: #333;
         }
         .in-words-row .amount-value {
             text-transform: uppercase;
             font-weight: 600;
             letter-spacing: 0.5px;
+            color: #d97706;
+        }
+        .footer { 
+            margin-top: 40px; 
+            font-size: 11px; 
+            color: #666;
+            text-align: center;
+            font-style: italic;
+            padding: 15px;
+            background: #f9f9f9;
+            border-radius: 5px;
+            border-top: 2px solid #e0e0e0;
+        }
+        .summary-box {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f0f4ff;
+            border-left: 4px solid #667eea;
+            border-radius: 5px;
+        }
+        .summary-row {
+            display: table-row;
+            font-size: 12px;
+        }
+        .summary-label {
+            display: table-cell;
+            font-weight: 600;
+            padding: 5px 15px 5px 0;
+            color: #555;
+        }
+        .summary-value {
+            display: table-cell;
+            color: #000;
+            padding: 5px 0;
         }
     </style>
 </head>
@@ -339,40 +417,96 @@ function SalarySlipPage() {
         <p>PAN: AAMCA0390C | TAN: DELA40504C</p>
     </div>
     <div class="payslip-title">Payslip for the month of ${monthName} ${selectedYear}</div>
-    <div class="employee-details">
-        <div class="left-column">
-            <div class="detail-row"><span class="detail-label">Group/Company:</span><span class="detail-value">Accunite Solutions PVT.LTD.</span></div>
-            <div class="detail-row"><span class="detail-label">Employee Name:</span><span class="detail-value">${data.employee_name || '-'}</span></div>
-            <div class="detail-row"><span class="detail-label">Employee Code:</span><span class="detail-value">${data.employee_code || '-'}</span></div>
-            <div class="detail-row"><span class="detail-label">Employee Designation:</span><span class="detail-value">${data.designation || '-'}</span></div>
-            <div class="detail-row"><span class="detail-label">Date of Joining:</span><span class="detail-value">${data.date_of_joining || '-'}</span></div>
-        </div>
-        <div class="right-column">
-            <div class="detail-row"><span class="detail-label">Bank Name:</span><span class="detail-value">${data.bank_name || '-'}</span></div>
-            <div class="detail-row"><span class="detail-label">IFSC:</span><span class="detail-value">${data.ifsc || '-'}</span></div>
-            <div class="detail-row"><span class="detail-label">Bank Account Number:</span><span class="detail-value">${data.bank_account_number || '-'}</span></div>
-            <div class="detail-row"><span class="detail-label">Aadhaar Number:</span><span class="detail-value">${data.aadhaar_number || '-'}</span></div>
-            <div class="detail-row"><span class="detail-label">Permanent Account Number:</span><span class="detail-value">${data.pan || '-'}</span></div>
-        </div>
-    </div>
-    <div class="earnings-deductions">
+    <table class="employee-details-table" style="width: 100%; border-collapse: collapse; margin-bottom: 25px;">
+        <thead>
+            <tr>
+                <th colspan="2" style="background-color: #1e3c72; color: #fff; padding: 12px; text-align: center; font-size: 14px; font-weight: bold;">Employee Details</th>
+                <th colspan="2" style="background-color: #1e3c72; color: #fff; padding: 12px; text-align: center; font-size: 14px; font-weight: bold;">Bank & Statutory Details</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td style="border: 1px solid #ddd; padding: 10px; font-weight: bold; width: 25%;">Group/Company:</td>
+                <td style="border: 1px solid #ddd; padding: 10px; width: 25%;">Accunite Solutions PVT.LTD.</td>
+                <td style="border: 1px solid #ddd; padding: 10px; font-weight: bold; width: 25%;">Bank Name:</td>
+                <td style="border: 1px solid #ddd; padding: 10px; width: 25%;">${data.bank_name || '-'}</td>
+            </tr>
+            <tr>
+                <td style="border: 1px solid #ddd; padding: 10px; font-weight: bold;">Employee Name:</td>
+                <td style="border: 1px solid #ddd; padding: 10px;">${data.employee_name || '-'}</td>
+                <td style="border: 1px solid #ddd; padding: 10px; font-weight: bold;">IFSC:</td>
+                <td style="border: 1px solid #ddd; padding: 10px;">${data.ifsc || '-'}</td>
+            </tr>
+            <tr>
+                <td style="border: 1px solid #ddd; padding: 10px; font-weight: bold;">Employee Code:</td>
+                <td style="border: 1px solid #ddd; padding: 10px;">${data.employee_code || '-'}</td>
+                <td style="border: 1px solid #ddd; padding: 10px; font-weight: bold;">Bank Account Number:</td>
+                <td style="border: 1px solid #ddd; padding: 10px;">${data.bank_account_number || '-'}</td>
+            </tr>
+            <tr>
+                <td style="border: 1px solid #ddd; padding: 10px; font-weight: bold;">Employee Designation:</td>
+                <td style="border: 1px solid #ddd; padding: 10px;">${data.designation || '-'}</td>
+                <td style="border: 1px solid #ddd; padding: 10px; font-weight: bold;">Aadhaar Number:</td>
+                <td style="border: 1px solid #ddd; padding: 10px;">${data.aadhaar_number || '-'}</td>
+            </tr>
+            <tr>
+                <td style="border: 1px solid #ddd; padding: 10px; font-weight: bold;">Date of Joining:</td>
+                <td style="border: 1px solid #ddd; padding: 10px;">${data.date_of_joining ? new Date(data.date_of_joining).toLocaleDateString('en-IN') : '-'}</td>
+                <td style="border: 1px solid #ddd; padding: 10px; font-weight: bold;">Permanent Account Number:</td>
+                <td style="border: 1px solid #ddd; padding: 10px;">${data.pan || '-'}</td>
+            </tr>
+        </tbody>
+    </table>
+    <div class="salary-table-container">
         <div class="earnings">
             <div class="section-title">EARNINGS</div>
-            <div class="amount-row"><span class="amount-label">BASIC:</span><span class="amount-value">₹${(data.basic || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
-            <div class="amount-row"><span class="amount-label">CONVEYANCE:</span><span class="amount-value">₹${(data.conveyance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
-            <div class="amount-row"><span class="amount-label">HOUSE RENT ALLOWANCE:</span><span class="amount-value">₹${(data.house_rent_allowance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
-            <div class="amount-row"><span class="amount-label">PERSONAL ALLOWANCE:</span><span class="amount-value">₹${(data.personal_allowance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
-            <div class="amount-row total-row"><span class="amount-label">Total Earning:</span><span class="amount-value">₹${(data.total_earning || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
-            <div class="amount-row total-row"><span class="amount-label">NET SALARY:</span><span class="amount-value">₹${netSalary.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
-            <div class="amount-row in-words-row"><span class="amount-label">IN WORDS:</span><span class="amount-value">${netSalaryWords}</span></div>
+            <div class="table-content">
+                <div style="display: table; width: 100%;">
+                    <div class="amount-row">
+                        <span class="amount-label">BASIC:</span>
+                        <span class="amount-value">₹${(data.basic || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                    <div class="amount-row">
+                        <span class="amount-label">CONVEYANCE:</span>
+                        <span class="amount-value">₹${(data.conveyance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                    <div class="amount-row">
+                        <span class="amount-label">HOUSE RENT ALLOWANCE:</span>
+                        <span class="amount-value">₹${(data.house_rent_allowance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                    <div class="amount-row">
+                        <span class="amount-label">PERSONAL ALLOWANCE:</span>
+                        <span class="amount-value">₹${(data.personal_allowance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                    <div class="amount-row total-row">
+                        <span class="amount-label">Total Earning:</span>
+                        <span class="amount-value">₹${(data.total_earning || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                    <div class="amount-row total-row">
+                        <span class="amount-label">NET SALARY:</span>
+                        <span class="amount-value">₹${netSalary.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                    <div class="amount-row in-words-row">
+                        <span class="amount-label">IN WORDS:</span>
+                        <span class="amount-value">${netSalaryWords}</span>
+                    </div>
+                </div>
+            </div>
         </div>
         <div class="deductions">
             <div class="section-title">DEDUCTIONS</div>
-            <div class="amount-row"><span class="amount-label">Paid Leave:</span><span class="amount-value">${data.paid_leave || 0}</span></div>
-            <div class="amount-row"><span class="amount-label">UnPaid Leave:</span><span class="amount-value">${data.unpaid_leave || 0}</span></div>
-            <div class="amount-row total-row"><span class="amount-label">Total Deduction:</span><span class="amount-value">₹${(data.total_deduction || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
-            <div class="amount-row" style="margin-top: 15px;"><span class="amount-label">Leave Remaining (incl. earned):</span><span class="amount-value">${data.leave_remaining || 0}</span></div>
-            <div class="amount-row"><span class="amount-label">Leave Allotted:</span><span class="amount-value">${data.leave_allotted || 0}</span></div>
+            <div class="table-content">
+                <div style="display: table; width: 100%;">
+                    <div class="amount-row">
+                        <span class="amount-label">Leaves Taken:</span>
+                        <span class="amount-value">${data.paid_leave || 0} days</span>
+                    </div>
+                    <div class="amount-row">
+                        <span class="amount-label">Remaining Leaves:</span>
+                        <span class="amount-value">${data.leave_remaining || 0} days</span>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
     <div class="footer">This is Computer Generated Payslip, does not need signatures.</div>
@@ -444,9 +578,20 @@ function SalarySlipPage() {
                                         onChange={handleYearChange}
                                         style={{ padding: '8px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '14px' }}
                                     >
-                                        {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - i).map(year => (
-                                            <option key={year} value={year}>{year}</option>
-                                        ))}
+                                        {Array.from({ length: 10 }, (_, i) => {
+                                            const year = new Date().getFullYear() - i;
+                                            const currentDate = new Date();
+                                            const currentYear = currentDate.getFullYear();
+                                            const currentMonth = currentDate.getMonth() + 1;
+                                            // Disable current year if current month is selected, or future years
+                                            const isDisabled = year > currentYear || 
+                                                (year === currentYear && selectedMonth >= currentMonth);
+                                            return (
+                                                <option key={year} value={year} disabled={isDisabled}>
+                                                    {year} {isDisabled ? '(Not Available)' : ''}
+                                                </option>
+                                            );
+                                        })}
                                     </select>
                                 </div>
                                 <div>
@@ -475,14 +620,16 @@ function SalarySlipPage() {
                                                 { value: 12, label: 'December' }
                                             ];
                                             return months.map(month => {
-                                                const isFuture = selectedYear > currentYear || (selectedYear === currentYear && month.value > currentMonth);
+                                                // Disable current month and future months - only previous months allowed
+                                                const isCurrentOrFuture = selectedYear > currentYear || 
+                                                    (selectedYear === currentYear && month.value >= currentMonth);
                                                 return (
                                                     <option 
                                                         key={month.value} 
                                                         value={month.value}
-                                                        disabled={isFuture}
+                                                        disabled={isCurrentOrFuture}
                                                     >
-                                                        {month.label} {isFuture ? '(Future)' : ''}
+                                                        {month.label} {isCurrentOrFuture ? '(Not Available)' : ''}
                                                     </option>
                                                 );
                                             });

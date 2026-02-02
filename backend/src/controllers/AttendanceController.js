@@ -58,7 +58,7 @@ class AttendanceController {
      */
     static async clockOut(req, res) {
         try {
-            const { employee_code } = req.body;
+            const { employee_code, work_summary } = req.body;
             const user = req.user; // From auth middleware
 
             if (!employee_code) {
@@ -76,7 +76,7 @@ class AttendanceController {
                 });
             }
 
-            const attendance = await AttendanceModel.clockOut(employee_code);
+            const attendance = await AttendanceModel.clockOut(employee_code, work_summary);
 
             res.json({
                 success: true,
@@ -170,15 +170,25 @@ class AttendanceController {
 
     /**
      * Manual attendance marking (for non-clocking employees)
+     * Employees can only mark their own attendance, admins can mark for anyone
      */
     static async markAttendance(req, res) {
         try {
             const { employee_code, date, status, notes } = req.body;
+            const user = req.user; // From auth middleware
 
             if (!employee_code || !date || !status) {
                 return res.status(400).json({
                     error: 'Bad Request',
                     message: 'Employee code, date, and status are required'
+                });
+            }
+
+            // Permission check: Employee can only mark their own attendance, admin can mark for anyone
+            if (user.role === 'employee' && user.employee_code !== employee_code) {
+                return res.status(403).json({
+                    error: 'Forbidden',
+                    message: 'You can only mark attendance for yourself'
                 });
             }
 
