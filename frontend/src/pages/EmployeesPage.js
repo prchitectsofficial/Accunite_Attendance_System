@@ -38,8 +38,7 @@ function EmployeesPage() {
             email: '',
             salary: '',
             attendance_type: 'clocking',
-            cl_balance: 12,
-            pl_balance: 15
+            leave_balance: 15
         });
         setShowModal(true);
     };
@@ -93,37 +92,31 @@ function EmployeesPage() {
     const handleAssignCredentials = (employee) => {
         setCredentialEmployee(employee);
         setCredentialEmail(employee.email || '');
-        // Show actual password if available, otherwise placeholder
         setCredentialPassword(employee.password_plain || (employee.password_hash ? '••••••••' : ''));
-        setShowPassword(true); // Show password by default if it exists
+        setShowPassword(true);
         setShowCredentialModal(true);
     };
 
     const handleSaveCredentials = async (e) => {
         e.preventDefault();
         try {
-            // If password is the placeholder and no plain text exists, treat it as empty (keep current)
             const passwordToSend = (credentialPassword === '••••••••' && !credentialEmployee.password_plain) || credentialPassword === ''
-                ? undefined 
+                ? undefined
                 : credentialPassword;
-            
-            // Check if email changed
+
             const emailChanged = credentialEmail !== credentialEmployee.email;
-            
-            // Check if password changed (only if it's different from current)
             const passwordChanged = passwordToSend && passwordToSend !== credentialEmployee.password_plain;
-            
-            // If no changes, just close
+
             if (!emailChanged && !passwordChanged && credentialEmployee.password_hash) {
                 showMessage('info', 'No changes to save');
                 setShowCredentialModal(false);
                 return;
             }
-            
+
             await employeeAPI.assignCredentials(
                 credentialEmployee.employee_code,
                 credentialEmail,
-                passwordToSend // Send undefined if empty (backend will keep existing)
+                passwordToSend
             );
             showMessage('success', credentialEmployee.password_hash ? 'Credentials updated successfully' : 'Credentials assigned successfully');
             setShowCredentialModal(false);
@@ -160,8 +153,7 @@ function EmployeesPage() {
                             <th>Employee Code</th>
                             <th>Name</th>
                             <th>Type</th>
-                            <th>CL Balance</th>
-                            <th>PL Balance</th>
+                            <th>Leave Balance</th>
                             <th>Status</th>
                             <th>Actions</th>
                         </tr>
@@ -172,8 +164,7 @@ function EmployeesPage() {
                                 <td>{emp.employee_code}</td>
                                 <td>{emp.name}</td>
                                 <td>{emp.attendance_type}</td>
-                                <td>{emp.cl_balance}</td>
-                                <td>{emp.pl_balance}</td>
+                                <td>{emp.leave_balance || 0}</td>
                                 <td>
                                     <span className={`badge badge-${emp.status === 'active' ? 'success' : 'danger'}`}>
                                         {emp.status}
@@ -182,8 +173,8 @@ function EmployeesPage() {
                                 <td>
                                     <button className="btn btn-sm btn-primary" onClick={() => handleEdit(emp)}>Edit</button>
                                     {' '}
-                                    <button 
-                                        className={`btn btn-sm ${emp.email && emp.password_hash ? 'btn-info' : 'btn-success'}`} 
+                                    <button
+                                        className={`btn btn-sm ${emp.email && emp.password_hash ? 'btn-info' : 'btn-success'}`}
                                         onClick={() => handleAssignCredentials(emp)}
                                     >
                                         {emp.email && emp.password_hash ? 'View/Edit Credentials' : 'Assign Credentials'}
@@ -252,21 +243,11 @@ function EmployeesPage() {
                                 </select>
                             </div>
                             <div className="form-group">
-                                <label>CL Balance</label>
+                                <label>Leave Balance</label>
                                 <input
                                     type="number"
-                                    step="0.5"
-                                    value={editingEmployee.cl_balance || 0}
-                                    onChange={(e) => setEditingEmployee({...editingEmployee, cl_balance: e.target.value})}
-                                />
-                            </div>
-                            <div className="form-group">
-                                <label>PL Balance</label>
-                                <input
-                                    type="number"
-                                    step="0.5"
-                                    value={editingEmployee.pl_balance || 0}
-                                    onChange={(e) => setEditingEmployee({...editingEmployee, pl_balance: e.target.value})}
+                                    value={editingEmployee.leave_balance || 0}
+                                    onChange={(e) => setEditingEmployee({...editingEmployee, leave_balance: e.target.value})}
                                 />
                             </div>
                             <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>
@@ -310,13 +291,12 @@ function EmployeesPage() {
                                             setCredentialPassword(e.target.value);
                                         }}
                                         onFocus={(e) => {
-                                            // Clear placeholder when focused if it's the placeholder
                                             if (credentialPassword === '••••••••' && !credentialEmployee.password_plain) {
                                                 setCredentialPassword('');
                                             }
                                         }}
                                         required={!credentialEmployee.password_hash}
-                                        placeholder={credentialEmployee.password_hash 
+                                        placeholder={credentialEmployee.password_hash
                                             ? "Current password (visible above) or enter new password"
                                             : "Enter password"}
                                         minLength="6"
@@ -337,14 +317,13 @@ function EmployeesPage() {
                                             fontSize: '14px',
                                             padding: '5px'
                                         }}
-                                        onClick={() => setShowPassword(!showPassword)}
                                         title={showPassword ? "Hide password" : "Show password"}
                                     >
                                         {showPassword ? '👁️' : '👁️‍🗨️'}
                                     </button>
                                 </div>
                                 <small style={{ color: '#666', display: 'block', marginTop: '5px' }}>
-                                    {credentialEmployee.password_hash 
+                                    {credentialEmployee.password_hash
                                         ? "Current password is shown above. Enter a new password to change it (minimum 6 characters), or leave as is to keep current."
                                         : "Minimum 6 characters"}
                                 </small>

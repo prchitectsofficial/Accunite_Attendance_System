@@ -1,18 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { employeeAPI, attendanceAPI } from '../services/api';
 
-// Helper function to get current date in IST timezone (UTC+5:30)
-const getISTDate = () => {
-    const now = new Date();
-    const istOffset = 5.5 * 60 * 60 * 1000; // 5.5 hours in milliseconds
-    const utcTime = now.getTime();
-    const istTime = new Date(utcTime + istOffset);
-    return istTime.toISOString().split('T')[0];
-};
-
 function AttendancePage() {
     const [employees, setEmployees] = useState([]);
-    const [selectedDate, setSelectedDate] = useState(getISTDate());
+    const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
     const [attendanceRecords, setAttendanceRecords] = useState([]);
     const [message, setMessage] = useState({ type: '', text: '' });
     const [loading, setLoading] = useState(false);
@@ -227,7 +218,7 @@ function AttendancePage() {
     };
 
     const getMaxDate = () => {
-        return getISTDate();
+        return new Date().toISOString().split('T')[0];
     };
 
     const getStatusBadge = (status) => {

@@ -45,9 +45,10 @@ export const authAPI = {
     login: (username, password) => api.post('/auth/login', { username, password }),
     employeeLogin: (email, password) => api.post('/auth/employee-login', { email, password }),
     freelancerLogin: (email, password) => api.post('/auth/freelancer-login', { email, password }),
+    portalLogin: (employee_code) => api.post('/auth/portal-login', { employee_code }),
+    checkPortalAuth: () => api.get('/auth/check-portal-auth'),
     verify: () => api.get('/auth/verify')
 };
-
 // Employee API
 export const employeeAPI = {
     getAll: () => api.get('/employees'),
