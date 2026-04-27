@@ -3,7 +3,6 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const cookieParser = require('cookie-parser');  // ADD THIS LINE
 require('dotenv').config();
-require('dotenv').config();
 
 const { testConnection } = require('./config/database');
 

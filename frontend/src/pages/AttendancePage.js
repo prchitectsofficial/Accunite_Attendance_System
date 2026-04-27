@@ -390,26 +390,33 @@ function AttendancePage() {
                                         <td style={{ padding: '12px', border: '1px solid #dee2e6', whiteSpace: 'nowrap' }}>
                                             {record.employee_name || emp.name || record.name}
                                         </td>
+
+<td style={{ padding: '12px', border: '1px solid #dee2e6', whiteSpace: 'nowrap' }}>
+    {record.attendance_type === 'non-clocking' 
+        ? (record.status === 'present' ? 'Working' : '-')
+        : formatTime(record.clock_in_time)
+    }
+</td>
+<td style={{ padding: '12px', border: '1px solid #dee2e6', whiteSpace: 'nowrap' }}>
+    {record.attendance_type === 'non-clocking' 
+        ? '-'
+        : formatTime(record.clock_out_time)
+    }
+</td>
                                         <td style={{ padding: '12px', border: '1px solid #dee2e6', whiteSpace: 'nowrap' }}>
-                                            {formatTime(record.clock_in_time)}
+
+{formatTime(record.break_start_time)}                                        </td>
+                                        <td style={{ padding: '12px', border: '1px solid #dee2e6', whiteSpace: 'nowrap' }}>
+                                            {formatTime(record.break_stop_time)}
                                         </td>
                                         <td style={{ padding: '12px', border: '1px solid #dee2e6', whiteSpace: 'nowrap' }}>
-                                            {isAdmin ? formatTime(record.clock_out_time) : (record.clock_in_time ? '-' : '-')}
+                                            {formatWorkingHours(record.total_working_minutes)}
                                         </td>
                                         <td style={{ padding: '12px', border: '1px solid #dee2e6', whiteSpace: 'nowrap' }}>
-                                            {isAdmin ? formatTime(record.break_start_time) : '-'}
+                                            {formatWorkingHours(record.late_minutes)}
                                         </td>
                                         <td style={{ padding: '12px', border: '1px solid #dee2e6', whiteSpace: 'nowrap' }}>
-                                            {isAdmin ? formatTime(record.break_stop_time) : '-'}
-                                        </td>
-                                        <td style={{ padding: '12px', border: '1px solid #dee2e6', whiteSpace: 'nowrap' }}>
-                                            {isAdmin ? formatWorkingHours(record.total_working_minutes) : '-'}
-                                        </td>
-                                        <td style={{ padding: '12px', border: '1px solid #dee2e6', whiteSpace: 'nowrap' }}>
-                                            {isAdmin ? formatWorkingHours(record.late_minutes) : '-'}
-                                        </td>
-                                        <td style={{ padding: '12px', border: '1px solid #dee2e6', whiteSpace: 'nowrap' }}>
-                                            {isAdmin ? formatWorkingHours(record.overtime_minutes) : '-'}
+                                            {formatWorkingHours(record.overtime_minutes)}
                                         </td>
                                         <td style={{ padding: '8px', border: '1px solid #dee2e6', whiteSpace: 'nowrap' }}>
                                             {canTakeAction(record.employee_code) ? (
@@ -446,7 +453,7 @@ function AttendancePage() {
                                                                     style={{ padding: '4px 8px', fontSize: '11px', lineHeight: '1.2', whiteSpace: 'nowrap', opacity: 0.6, cursor: 'not-allowed' }}
                                                                     title="Already clocked out for today"
                                                                 >
-                                                                    Clock In (Disabled)
+                                                                    Clock In
                                                                 </button>
                                                             ) : !clockedIn ? (
                                                                 <button 

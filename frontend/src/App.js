@@ -94,13 +94,22 @@ function AppContent() {
                         
                         if (response.data.authenticated && response.data.employee_code) {
                             console.log('Portal SSO detected, auto-login for:', response.data.employee_code);
-                            
                             const loginResponse = await authAPI.portalLogin(response.data.employee_code);
                             const { token, user: portalUser } = loginResponse.data;
-
                             localStorage.setItem('token', token);
                             localStorage.setItem('user', JSON.stringify(portalUser));
                             setUser(portalUser);
+                        } else if (response.data.authenticated && response.data.email) {
+                            console.log('Portal email SSO for:', response.data.email);
+                            const loginResponse = await authAPI.adminEmailLogin(response.data.email);
+                            if (loginResponse.data.token) {
+                                localStorage.setItem('token', loginResponse.data.token);
+                                localStorage.setItem('user', JSON.stringify(loginResponse.data.user));
+                                setUser(loginResponse.data.user);
+                                window.location.href = '/attendance/dashboard';
+                            }
+                        
+                        // dummy to close
                             
                             // If on login page or root, redirect to attendance
                             if (location.pathname === '/login' || location.pathname === '/') {

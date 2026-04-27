@@ -63,8 +63,7 @@ class AuthController {
                 {
                     admin_id: user.admin_id,
                     username: user.username,
-                    full_name: user.full_name,
-                    role: 'admin'
+                    full_name: user.full_name
                 },
                 process.env.JWT_SECRET,
                 { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }

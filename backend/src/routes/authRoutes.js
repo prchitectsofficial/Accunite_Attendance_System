@@ -32,6 +32,11 @@ router.get('/check-portal-auth', async (req, res) => {
         const jwt = require('jsonwebtoken');
         const decoded = jwt.verify(token, process.env.JWT_SECRET || 'AccuniteJWTSecretKey2026ChangeThis!');
         
+        // Check admin emails FIRST
+        const ADMIN_EMAILS = ["manish@prchitects.com", "contact@prchitects.com", "kapil@prchitects.com"];
+        if (decoded.email && ADMIN_EMAILS.includes(decoded.email)) {
+            return res.json({ authenticated: true, is_admin: true, email: decoded.email, name: decoded.name });
+        }
         if (decoded.employee_code) {
             // User has employee code, return it for auto-login
             return res.json({
@@ -42,7 +47,12 @@ router.get('/check-portal-auth', async (req, res) => {
             });
         }
         
-        res.json({ authenticated: false, reason: 'No employee code' });
+        // Portal token (email-based SSO)
+        if (decoded.email) {
+            const ADMIN_EMAILS = ["manish@prchitects.com", "contact@prchitects.com", "kapil@prchitects.com"];
+            return res.json({ authenticated: true, is_admin: ADMIN_EMAILS.includes(decoded.email), email: decoded.email, name: decoded.name || decoded.email });
+        }
+        res.json({ authenticated: false, reason: "No employee code or email" });
     } catch (error) {
         console.error('Portal auth check error:', error);
         res.json({ authenticated: false, reason: 'Invalid token' });
@@ -76,7 +86,7 @@ router.post('/portal-login', async (req, res) => {
                 role: 'employee'  // Employee privileges only
             },
             process.env.JWT_SECRET || 'AccuniteJWTSecretKey2026ChangeThis!',
-            { expiresIn: '24h' }
+            { expiresIn: '12h' }
         );
 
         res.json({
@@ -96,3 +106,19 @@ router.post('/portal-login', async (req, res) => {
 });
 
 module.exports = router;
+
+// POST /api/auth/admin-email-login - SSO login via portal email
+router.post('/admin-email-login', async (req, res) => {
+    try {
+        const { email } = req.body;
+        if (!email) return res.status(400).json({ error: 'Email required' });
+        const ADMIN_EMAILS = ["manish@prchitects.com", "contact@prchitects.com", "kapil@prchitects.com"];
+        const isAdmin = ADMIN_EMAILS.includes(email);
+        const jwt = require('jsonwebtoken');
+        const user = { name: email.split('@')[0], email, role: isAdmin ? 'admin' : 'employee', admin_id: isAdmin ? 1 : null };
+        const token = jwt.sign(user, process.env.JWT_SECRET || 'AccuniteJWTSecretKey2026ChangeThis!', { expiresIn: '12h' });
+        res.json({ token, user });
+    } catch (error) {
+        res.status(500).json({ error: 'Login failed' });
+    }
+});
